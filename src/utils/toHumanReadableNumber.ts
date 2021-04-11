@@ -4,6 +4,7 @@ const defaultFormatter: (num: number) => string | number = (num: number) => num;
 
 export function toHumanReadableNumber(
     num: number,
+    baseUnit: string = 'B',
     prefix: 1000 | 1024 = 1000,
     formatter = defaultFormatter
 ) {
@@ -14,6 +15,5 @@ export function toHumanReadableNumber(
         iterations++;
     } while (num >= prefix)
 
-
-    return `${formatter(num)} ${units[iterations]}${prefix === 1024 ? 'i' : ''}B`;
+    return `${formatter(num)} ${units[iterations]}${prefix === 1024 ? 'i' : ''}${baseUnit}`;
 }

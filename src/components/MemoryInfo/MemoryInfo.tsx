@@ -30,7 +30,7 @@ export const MemoryInfo: React.FC<MemoryInfoProps> = (props) => {
         <>
             <div className="resource-title">
                 <h1>Memory</h1>
-                <h2>{(toHumanReadableNumber(totalCapacity * 1024, 1024, num => num.toPrecision(2)))}</h2>
+                <h2>{(toHumanReadableNumber(totalCapacity * 1024, 'B', 1024, num => num.toPrecision(2)))}</h2>
             </div>
             <h6>Memory usage</h6>
             <AreaChart compact margin={{ top: 2, left: 2, right: 2, bottom: 2 }} width={600} height={200} data={graphData}>
@@ -78,19 +78,19 @@ export const MemoryInfo: React.FC<MemoryInfoProps> = (props) => {
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 {
                     swapCapacity !== undefined
-                        ? <LabeledStat label="Swap capacity" value={toHumanReadableNumber(swapCapacity * 1024, 1024, num => num.toPrecision(2))} />
+                        ? <LabeledStat label="Swap capacity" value={toHumanReadableNumber(swapCapacity * 1024, 'B', 1024, num => num.toPrecision(2))} />
                         : undefined
                 }
 
                 {
                     swapUsed !== undefined
-                        ? <LabeledStat label="Swap usage" value={toHumanReadableNumber(swapUsed * 1024, 1024)} />
+                        ? <LabeledStat label="Swap usage" value={toHumanReadableNumber(swapUsed * 1024, 'B', 1024)} />
                         : undefined
                 }
 
-                <LabeledStat label="In use" value={toHumanReadableNumber(nonCacheOrBuffer * 1024, 1024, num => num.toPrecision(2))} />
-                <LabeledStat label="Cached" value={toHumanReadableNumber(cached * 1024, 1024, num => num.toPrecision(2))} />
-                <LabeledStat label="Buffered" value={toHumanReadableNumber(buffers * 1024, 1024, num => num.toPrecision(2))} />
+                <LabeledStat label="In use" value={toHumanReadableNumber(nonCacheOrBuffer * 1024, 'B', 1024, num => num.toPrecision(2))} />
+                <LabeledStat label="Cached" value={toHumanReadableNumber(cached * 1024, 'B', 1024, num => num.toPrecision(2))} />
+                <LabeledStat label="Buffered" value={toHumanReadableNumber(buffers * 1024, 'B', 1024, num => num.toPrecision(2))} />
             </div>
         </>
     );

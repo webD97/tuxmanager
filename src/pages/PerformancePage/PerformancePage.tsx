@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, Route, Switch, useRouteMatch } from 'react-router-dom';
-import { AreaChart, Area, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { CpuInfo } from '../../components/CpuInfo/CpuInfo';
 import { DiskInfo } from '../../components/DiskInfo/DiskInfo';
 import { MemoryInfo } from '../../components/MemoryInfo/MemoryInfo';
@@ -30,7 +30,7 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
     const [cpuHistory, pushCpuHistory] = useTimeseries(60);
     const [cpuUsageHistory, pushCpuUsage] = useTimeseries<number>(60);
 
-    const [blockDeviceHistory, pushBlockDeviceHistory] = useTimeseries<Record<string, number[]>>(60);
+    const [blockDeviceHistory, pushBlockDeviceHistory] = useTimeseries<Record<string, any>>(60);
     const [blockDevices, setBlockDevices] = useState<Record<string, any>>({});
 
     useEffect(() => {
@@ -97,6 +97,27 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
 
     const match = useRouteMatch();
 
+    const diskTransferData: Record<string, any> = {};
+
+    blockDeviceHistory.forEach((entry, index, blockDeviceHistory) => {
+        Object.keys(entry.value).forEach(device => {
+            const m1 = blockDeviceHistory[index];
+            const m2 = blockDeviceHistory[index - 1];
+
+            if (m1 === undefined || m2 === undefined) {
+                return { bytesReadPerSecond: 0, bytesWrittenPerSecond: 0, activeTime: 0 }
+            }
+
+            const bytesWrittenPerSecond = ((m1.value[device].stat.write_sectors - m2.value[device].stat.write_sectors) * 512) / ((m1.timestamp - m2.timestamp) / 1000);
+            const bytesReadPerSecond = ((m1.value[device].stat.read_sectors - m2.value[device].stat.read_sectors) * 512) / ((m1.timestamp - m2.timestamp) / 1000);
+            const activeTime = (m1.value[device].stat.io_ticks - m2.value[device].stat.io_ticks) / ((m1.timestamp - m2.timestamp) / 1000);
+
+
+            diskTransferData[device] = [ ...(Array.isArray(diskTransferData[device]) ? diskTransferData[device] : []), { bytesWrittenPerSecond, bytesReadPerSecond, activeTime } ];
+            diskTransferData[device] = [...(diskTransferData.length < 60 ? new Array(60 - diskTransferData.length).fill({ bytesReadPerSecond: 0, bytesWrittenPerSecond: 0, activeTime: 0 }) : []), ...diskTransferData[device]]
+        });
+    })
+
     return (
         <>
             <section>
@@ -140,7 +161,7 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
                             </AreaChart>
                         }
                         title="RAM"
-                        subtitle={`${toHumanReadableNumber(ramNonCacheOrBuffer * 1024, 1024, num => num.toPrecision(2))}/${(toHumanReadableNumber(ramTotalCapacity * 1024, 1024, num => num.toPrecision(2)))} (${(100 * ramNonCacheOrBuffer / ramTotalCapacity).toFixed(0)}%)`}
+                        subtitle={`${toHumanReadableNumber(ramNonCacheOrBuffer * 1024, 'B', 1024, num => num.toPrecision(2))}/${(toHumanReadableNumber(ramTotalCapacity * 1024, 'B', 1024, num => num.toPrecision(2)))} (${(100 * ramNonCacheOrBuffer / ramTotalCapacity).toFixed(0)}%)`}
                     />
                 </Link>
 
@@ -148,9 +169,22 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
                     Object.entries(blockDevices).map(([name, metrics]) => (
                         <Link to={`${match.url}/blk/${name}`} key={name} style={{ textDecoration: 'none' }}>
                             <SideNavigationItem
-                                visual={<img alt="" src="http://placehold.it/90x48" />}
+                                visual={
+                                    <AreaChart compact margin={{ top: 2, left: 2, right: 2, bottom: 2 }} width={90} height={48} data={diskTransferData[name]}>
+                                        <CartesianGrid fill="#ffffff" stroke="#62b029" />
+                                        <XAxis hide tick={false} />
+                                        <YAxis hide tick={false} domain={[0, 1000]} />
+                                        <Area type="monotone"
+                                            dataKey="activeTime"
+                                            fill="#eff7e9"
+                                            stroke="#62b029"
+                                            isAnimationActive={false}
+                                            dot={false}
+                                        />
+                                    </AreaChart>
+                                }
                                 title={name}
-                                subtitle={"lol"}
+                                subtitle={diskTransferData[name] ? (diskTransferData[name][diskTransferData[name].length - 1].activeTime / 10.0).toFixed(0) + '%' : ''}
                             />
                         </Link>
                     ))
@@ -193,8 +227,10 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
                             return (
                                 <DiskInfo
                                     name={match.params.name!}
+                                    removable={blockDevices[match.params.name!].removable}
                                     capacity={blockDevices[match.params.name!].capacity}
                                     partitions={blockDevices[match.params.name!].partitions}
+                                    history={diskTransferData[match.params.name!]}
                                 />
                             );
                         }

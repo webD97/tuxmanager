@@ -108,10 +108,33 @@ contextBridge.exposeInMainWorld('api', {
 
         disks.forEach(disk => {
             disksWithStat[disk] = {
-                stat: fs.readFileSync(`/sys/block/${disk}/stat`).toString()
-                    .split(/\s{1,}/)
-                    .filter(value => value !== '')
-                    .map(value => parseInt(value)),
+                removable: fs.readFileSync(`/sys/block/${disk}/stat`).toString().startsWith('0') ? false : true,
+                stat: (() => {
+                    const values = fs.readFileSync(`/sys/block/${disk}/stat`).toString()
+                        .split(/\s{1,}/)
+                        .filter(value => value !== '')
+                        .map(value => parseInt(value));
+
+                    return ({
+                        read_ios: values[0],
+                        read_merges: values[1],
+                        read_sectors: values[2],
+                        read_ticks: values[3],
+                        write_ios: values[4],
+                        write_merges: values[5],
+                        write_sectors: values[6],
+                        write_ticks: values[7],
+                        in_flight: values[8],
+                        io_ticks: values[9],
+                        time_in_queue: values[10],
+                        discard_ios: values[11],
+                        discard_merges: values[12],
+                        discard_sectors: values[13],
+                        discard_ticks: values[14],
+                        flush_ios: values[15],
+                        flush_ticks: values[16]
+                    });
+                })(),
                 capacity: parseInt(fs.readFileSync(`/sys/block/${disk}/size`).toString()) * 512,
                 partitions: (() => {
                     const parts = {};
