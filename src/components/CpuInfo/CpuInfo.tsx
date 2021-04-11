@@ -55,7 +55,7 @@ export const CpuInfo: React.FC<CpuInfoProps> = (props) => {
                     <LabeledStat label="Usage" value={usageHistory.map(entry => entry.value).reduce((prev, next) => next > prev ? next : prev, 0).toLocaleString()} append="%" />
                 </div>
                 <div style={{ gridArea: "frequency" }}>
-                    <LabeledStat label="Usage" value={freq.toLocaleString(undefined, {
+                    <LabeledStat label="Frequency" value={freq.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     })} append=" GHz" />

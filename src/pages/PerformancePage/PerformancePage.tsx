@@ -44,7 +44,7 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
 
             setUptime(seconds);
             setCpuName(cpuInfo[0]['model name']);
-            setCpuFreq((parseFloat(cpuInfo[0]['cpu MHz']) / 1000.0));
+            setCpuFreq(cpuInfo.map((cpu: any) => parseFloat(cpu['cpu MHz']) / 1000.0).reduce((prev: number, next: number) => Math.max(prev, next), 0));
 
             pushCpuHistory(window.api.getUsageOfCPU()[0]);
 
@@ -138,7 +138,7 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
                             </AreaChart>
                         }
                         title="CPU"
-                        subtitle={cpuUsageHistory.map(entry => entry.value).reduce((prev, next) => next > prev ? next : prev, 0).toFixed(0) + '% ' + cpuFreq.toLocaleString(undefined, {
+                        subtitle={cpuUsageHistory.map(entry => entry.value)[cpuUsageHistory.length - 1].toFixed(0) + '% ' + cpuFreq.toLocaleString(undefined, {
                             maximumFractionDigits: 2
                         }) + ' GHz'}
                     />
