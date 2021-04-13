@@ -3,6 +3,7 @@ import { Link, Route, Switch, useRouteMatch } from 'react-router-dom';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { CpuInfo } from '../../components/CpuInfo/CpuInfo';
 import { DiskInfo } from '../../components/DiskInfo/DiskInfo';
+import { InterfaceInfo } from '../../components/InterfaceInfo/InterfaceInfo';
 import { MemoryInfo } from '../../components/MemoryInfo/MemoryInfo';
 import { SideNavigationItem } from '../../components/SideNavigationItem/SideNavigationItem';
 import { useTimeseries } from '../../hooks/useTimeseries';
@@ -32,6 +33,9 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
 
     const [blockDeviceHistory, pushBlockDeviceHistory] = useTimeseries<Record<string, any>>(60);
     const [blockDevices, setBlockDevices] = useState<Record<string, any>>({});
+
+    const [interfaces, setInterfaces] = useState<Record<string, any>>([]);
+    const [interfaceHistory, pushInterfaceHistory] = useTimeseries<Record<string, any>>(60);
 
     useEffect(() => {
         const collectInfo = () => {
@@ -68,6 +72,10 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
             setBlockDevices(blkDevices);
 
             pushBlockDeviceHistory(blkDevices);
+
+            const ifaces = window.api.getInterfaces();
+            setInterfaces(ifaces);
+            pushInterfaceHistory(ifaces);
         };
 
         collectInfo();
@@ -75,7 +83,7 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
         const handle = window.setInterval(collectInfo, props.updateInterval);
 
         return () => window.clearInterval(handle);
-    }, [props.updateInterval, pushBlockDeviceHistory, pushCpuHistory, pushRamHistory]);
+    }, [props.updateInterval, pushBlockDeviceHistory, pushCpuHistory, pushInterfaceHistory, pushRamHistory]);
 
     useEffect(() => {
         if (cpuHistory.length >= 2) {
@@ -113,10 +121,29 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
             const activeTime = (m1.value[device].stat.io_ticks - m2.value[device].stat.io_ticks) / ((m1.timestamp - m2.timestamp) / 1000);
 
 
-            diskTransferData[device] = [ ...(Array.isArray(diskTransferData[device]) ? diskTransferData[device] : []), { bytesWrittenPerSecond, bytesReadPerSecond, activeTime } ];
+            diskTransferData[device] = [...(Array.isArray(diskTransferData[device]) ? diskTransferData[device] : []), { bytesWrittenPerSecond, bytesReadPerSecond, activeTime }];
             diskTransferData[device] = [...(diskTransferData.length < 60 ? new Array(60 - diskTransferData.length).fill({ bytesReadPerSecond: 0, bytesWrittenPerSecond: 0, activeTime: 0 }) : []), ...diskTransferData[device]]
         });
-    })
+    });
+
+    const interfaceGraphData: Record<string, any> = {};
+
+    interfaceHistory.forEach((entry, index, interfaceHistory) => {
+        Object.keys(entry.value).forEach(device => {
+            const m1 = interfaceHistory[index];
+            const m2 = interfaceHistory[index - 1];
+
+            if (m1 === undefined || m2 === undefined) {
+                return { bitsWritten: 0, bitsRead: 0 }
+            }
+
+            const bitsWritten = (8 * (m1.value[device].txBytes - m2.value[device].txBytes)) / ((m1.timestamp - m2.timestamp) / 1000);
+            const bitsRead = (8 * (m1.value[device].rxBytes - m2.value[device].rxBytes)) / ((m1.timestamp - m2.timestamp) / 1000);
+
+            interfaceGraphData[device] = [...(Array.isArray(interfaceGraphData[device]) ? interfaceGraphData[device] : []), { bitsWritten, bitsRead }];
+            interfaceGraphData[device] = [...(interfaceGraphData.length < 60 ? new Array(60 - interfaceGraphData.length).fill({ bitsWritten: 0, bitsRead: 0 }) : []), ...interfaceGraphData[device]]
+        });
+    });
 
     return (
         <>
@@ -138,7 +165,7 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
                             </AreaChart>
                         }
                         title="CPU"
-                        subtitle={cpuUsageHistory.map(entry => entry.value)[cpuUsageHistory.length - 1].toFixed(0) + '% ' + cpuFreq.toLocaleString(undefined, {
+                        subtitle={cpuUsageHistory.map(entry => entry.value)[cpuUsageHistory.length - 1]?.toFixed(0) + '% ' + cpuFreq.toLocaleString(undefined, {
                             maximumFractionDigits: 2
                         }) + ' GHz'}
                     />
@@ -189,6 +216,54 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
                         </Link>
                     ))
                 }
+
+                {
+                    Object.entries(interfaces).map(([name, metrics]) => (
+                        <Link to={`${match.url}/iface/${name}`} key={name} style={{ textDecoration: 'none' }}>
+                            <SideNavigationItem
+                                visual={
+                                    <AreaChart compact margin={{ top: 2, left: 2, right: 2, bottom: 2 }} width={90} height={48} data={interfaceGraphData[name]}>
+                                        <CartesianGrid fill="#ffffff" stroke="#6b6041" />
+                                        <XAxis hide tick={false} />
+                                        <YAxis hide tick={false} />
+                                        <Area type="monotone"
+                                            dataKey="bitsRead"
+                                            fill="#fff3ea"
+                                            stroke="#6b6041"
+                                            isAnimationActive={false}
+                                            dot={false}
+                                        />
+                                        <Area type="monotone"
+                                            dataKey="bitsWritten"
+                                            fill="transparent"
+                                            stroke="#6b6041"
+                                            isAnimationActive={false}
+                                            dot={false}
+                                        />
+                                    </AreaChart>
+                                }
+                                title={name}
+                                subtitle={
+                                    `D: ${
+                                        toHumanReadableNumber(
+                                            interfaceGraphData[name][interfaceGraphData[name].length - 1].bitsRead.toString(),
+                                            'bit/s',
+                                            1000,
+                                            num => Math.round(num)
+                                        )
+                                    } U: ${
+                                        toHumanReadableNumber(
+                                            interfaceGraphData[name][interfaceGraphData[name].length - 1].bitsWritten.toString(),
+                                            'bit/s',
+                                            1000,
+                                            num => Math.round(num)
+                                        )
+                                    }`
+                                }
+                            />
+                        </Link>
+                    ))
+                }
             </section>
             <section>
                 <Switch>
@@ -235,7 +310,27 @@ export const PerformancePage: React.FC<PageProps> = (props) => {
                             );
                         }
                     }
+                    />
 
+                    <Route path={`${match.path}/iface/:name`} render={
+                        ({ match, history }) => {
+                            if (interfaces[match.params.name!] === undefined) {
+                                history.push('/performance/cpu');
+
+                                return <></>;
+                            }
+
+                            return (
+                                <InterfaceInfo
+                                    name={match.params.name!}
+                                    address={interfaces[match.params.name!].address}
+                                    mtu={interfaces[match.params.name!].mtu}
+                                    state={interfaces[match.params.name!].operstate}
+                                    history={interfaceGraphData[match.params.name!] || []}
+                                />
+                            );
+                        }
+                    }
                     />
                 </Switch>
             </section>

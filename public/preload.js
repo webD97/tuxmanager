@@ -171,5 +171,20 @@ contextBridge.exposeInMainWorld('api', {
         });
 
         return processes;
+    },
+    getInterfaces: function() {
+        const interfaces = {};
+
+        fs.readdirSync('/sys/class/net').forEach((iface) => {
+            interfaces[iface] = {
+                address: fs.readFileSync(`/sys/class/net/${iface}/address`).toString(),
+                operstate: fs.readFileSync(`/sys/class/net/${iface}/operstate`).toString(),
+                mtu: parseInt(fs.readFileSync(`/sys/class/net/${iface}/mtu`).toString()),
+                rxBytes: parseInt(fs.readFileSync(`/sys/class/net/${iface}/statistics/rx_bytes`).toString()),
+                txBytes: parseInt(fs.readFileSync(`/sys/class/net/${iface}/statistics/tx_bytes`).toString()),
+            };
+        });
+
+        return interfaces;
     }
 });
